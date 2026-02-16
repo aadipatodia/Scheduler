@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Scheduler - Smart Goal Planning</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 AI Scheduler</h1>
+            <p>Transform your goals into actionable plans with AI</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Create Goal Card -->
+            <div class="card">
+                <h2>Create New Goal</h2>
+                <form id="goalForm">
+                    <div class="form-group">
+                        <label for="goalTitle">Goal Title *</label>
+                        <input type="text" id="goalTitle" required placeholder="e.g., Learn Spanish, Get Fit, Build a SaaS">
+                    </div>
+                    <div class="form-group">
+                        <label for="goalDescription">Description</label>
+                        <textarea id="goalDescription" placeholder="Describe your goal and any context..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="goalTargetDate">Target Date (Optional)</label>
+                        <input type="date" id="goalTargetDate">
+                    </div>
+                    <button type="submit">Create Goal</button>
+                </form>
+            </div>
+
+            <!-- Create Task Card -->
+            <div class="card">
+                <h2>Quick Add Task</h2>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="taskTitle">Task Title *</label>
+                        <input type="text" id="taskTitle" required placeholder="What needs to be done?">
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDescription">Description</label>
+                        <textarea id="taskDescription" placeholder="Task details..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select id="taskPriority">
+                            <option value="5">🔥 Highest (5)</option>
+                            <option value="4">⚡ High (4)</option>
+                            <option value="3" selected>⭐ Medium (3)</option>
+                            <option value="2">📌 Low (2)</option>
+                            <option value="1">💤 Lowest (1)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDate">Scheduled Date</label>
+                        <input type="date" id="taskDate">
+                    </div>
+                    <button type="submit">Create Task</button>
+                </form>
+            </div>
+
+            <!-- Today's Tasks -->
+            <div class="card">
+                <h2>📅 Today's Tasks</h2>
+                <div id="tasksList" class="tasks-list">
+                    <div class="loading">Loading tasks...</div>
+                </div>
+            </div>
+
+            <!-- Your Goals -->
+            <div class="card">
+                <h2>🎯 Your Goals</h2>
+                <div id="goalsList" class="goals-list">
+                    <div class="loading">Loading goals...</div>
+                </div>
+            </div>
+
+            <!-- AI Roadmap -->
+            <div class="card full-width">
+                <h2>🤖 AI-Generated Roadmap</h2>
+                <p style="color: #666; margin-bottom: 15px;">Click on a goal to generate or view its AI-powered roadmap</p>
+                <div id="roadmapContent">
+                    <p style="text-align: center; color: #999; padding: 40px;">
+                        Select a goal to generate a roadmap with Gemini AI
+                    </p>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card full-width">
+                <h2>📊 Your Progress</h2>
+                <div id="statsContent">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
