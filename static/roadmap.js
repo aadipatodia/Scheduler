@@ -295,7 +295,7 @@ async function submitChanges() {
     document.getElementById('generatingState').innerHTML = `
         <div class="spinner"></div>
         <div class="generating-text">🤖 Refining your roadmap...</div>
-        <div class="generating-subtext">Gemini is updating the plan based on your feedback</div>
+        <div class="generating-subtext">We is updating the plan based on your feedback</div>
     `;
 
     try {

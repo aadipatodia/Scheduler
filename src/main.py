@@ -131,25 +131,39 @@ async def delete_goal(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a goal and all related data (roadmap, milestones, tasks, logs)
+    Delete a goal and all related data (roadmap, milestones, tasks, audit logs)
     """
     from .models import RecalibrationLog, ConversationHistory
-    
+
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
-    
+
     try:
-        # Manually clean up any records that might not be covered by cascade
-        db.query(RecalibrationLog).filter(RecalibrationLog.goal_id == goal_id).delete()
-        db.query(ConversationHistory).filter(ConversationHistory.goal_id == goal_id).delete()
-        
-        db.delete(goal)
+        # Explicitly delete bottom-up to avoid FK constraint issues
+        # 1. Delete audit logs for all tasks under this goal's milestones
+        milestone_ids = [m.id for m in db.query(Milestone.id).filter(Milestone.goal_id == goal_id).all()]
+        if milestone_ids:
+            task_ids = [t.id for t in db.query(Task.id).filter(Task.milestone_id.in_(milestone_ids)).all()]
+            if task_ids:
+                db.query(AuditLog).filter(AuditLog.task_id.in_(task_ids)).delete(synchronize_session=False)
+            # 2. Delete tasks
+            db.query(Task).filter(Task.milestone_id.in_(milestone_ids)).delete(synchronize_session=False)
+        # 3. Delete milestones
+        db.query(Milestone).filter(Milestone.goal_id == goal_id).delete(synchronize_session=False)
+        # 4. Delete roadmap
+        db.query(Roadmap).filter(Roadmap.goal_id == goal_id).delete(synchronize_session=False)
+        # 5. Delete other related records
+        db.query(RecalibrationLog).filter(RecalibrationLog.goal_id == goal_id).delete(synchronize_session=False)
+        db.query(ConversationHistory).filter(ConversationHistory.goal_id == goal_id).delete(synchronize_session=False)
+        # 6. Delete the goal itself
+        db.query(Goal).filter(Goal.id == goal_id).delete(synchronize_session=False)
+
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete goal: {str(e)}")
-    
+
     return {"message": "Goal deleted", "goal_id": goal_id}
 
 
@@ -345,14 +359,18 @@ async def approve_roadmap(
 @app.post("/roadmaps/{roadmap_id}/refine", response_model=RoadmapResponse)
 async def refine_roadmap(
     roadmap_id: int,
-    feedback: str,
+    body: dict,
     db: Session = Depends(get_db)
 ):
     """
     Refine roadmap based on user feedback (returns structured JSON phases)
     """
     import json as json_module
-    
+
+    feedback = body.get("feedback", "")
+    if not feedback:
+        raise HTTPException(status_code=400, detail="Feedback is required")
+
     roadmap = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")

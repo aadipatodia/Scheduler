@@ -546,113 +546,164 @@ button:disabled {
     animation: slideInLeft 0.5s ease both;
 }
 
-/* Horizontal Tasks List */
-.tasks-list-horizontal {
+/* ==================== TODAY'S TASKS ==================== */
+
+.today-card {
+    padding: 24px 28px !important;
+}
+
+.today-card h2 {
+    margin-bottom: 0 !important;
+    font-size: 1.4rem !important;
+}
+
+.today-header {
     display: flex;
-    gap: 16px;
-    overflow-x: auto;
-    padding-bottom: 16px;
-    scroll-behavior: smooth;
-}
-
-.tasks-list-horizontal::-webkit-scrollbar {
-    height: 8px;
-}
-
-.tasks-list-horizontal::-webkit-scrollbar-track {
-    background: var(--bg-card);
-    border-radius: 4px;
-}
-
-.tasks-list-horizontal::-webkit-scrollbar-thumb {
-    background: var(--accent-primary);
-    border-radius: 4px;
-}
-
-.tasks-list-horizontal .task-item {
-    min-width: 300px;
-    max-width: 350px;
-    flex-shrink: 0;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.tasks-list-horizontal .task-checkbox {
-    margin-bottom: 12px;
-}
-
-.tasks-list-horizontal .task-content {
-    margin-bottom: 12px;
-}
-
-/* Today's tasks summary bar */
-.today-summary {
-    display: flex;
-    gap: 16px;
+    justify-content: space-between;
     align-items: center;
-    width: 100%;
-    padding: 10px 16px;
-    background: rgba(139, 92, 246, 0.08);
-    border-radius: 10px;
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-    min-width: 100%;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
-.summary-total {
-    font-weight: 600;
-    color: var(--text-primary);
+.today-summary-inline {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 0.85rem;
 }
 
 .summary-done {
     color: #10b981;
-    font-weight: 500;
+    font-weight: 600;
 }
 
 .summary-due {
-    color: var(--accent-primary);
+    color: var(--text-secondary);
     font-weight: 500;
-}
-
-/* Task context label (goal & milestone) */
-.task-context {
-    display: inline-block;
-    margin-top: 6px;
-    font-size: 0.75rem;
-    color: var(--accent-primary);
-    background: rgba(139, 92, 246, 0.1);
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-weight: 500;
-}
-
-.task-item.task-completed {
-    opacity: 0.65;
-    background: rgba(16, 185, 129, 0.05);
-    border-color: rgba(16, 185, 129, 0.2);
-}
-
-/* Rescheduled / carried-over tasks */
-.task-item.task-rescheduled {
-    border-left: 3px solid #f59e0b;
-}
-
-.task-rescheduled-badge {
-    display: inline-block;
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.12);
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-    vertical-align: middle;
 }
 
 .summary-rescheduled {
     color: #f59e0b;
     font-weight: 500;
+}
+
+/* Checklist layout */
+.tasks-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.empty-state {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 24px 0;
+    font-size: 0.95rem;
+}
+
+.checklist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.checklist-row:hover {
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.12);
+}
+
+.checklist-cb {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+    margin: 0;
+}
+
+.checklist-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.checklist-text {
+    flex: 1;
+    font-size: 0.93rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.5;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.checklist-row .task-priority {
+    padding: 3px 10px;
+    border-radius: 14px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Completed state */
+.checklist-row.done {
+    opacity: 0.55;
+}
+
+.checklist-row.done .checklist-text {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+.checklist-row.done .checklist-num {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+/* Rescheduled / carried-over */
+.checklist-row.rescheduled {
+    border-left: 3px solid #f59e0b;
+}
+
+.task-rescheduled-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* Phase group header */
+.checklist-group {
+    margin-bottom: 6px;
+}
+
+.checklist-phase-header {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--accent-secondary);
+    padding: 10px 14px 4px;
+    opacity: 0.85;
 }

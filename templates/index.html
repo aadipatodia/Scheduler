@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Scheduler - Smart Goal Planning</title>
-    <link rel="stylesheet" href="/static/styles.css?v=6">
+    <link rel="stylesheet" href="/static/styles.css?v=9">
 </head>
 <body>
     <div class="container">
@@ -66,9 +66,12 @@
 
         <!-- Today's Tasks - Full Width Below -->
         <div class="full-width-section">
-            <div class="card">
-                <h2>📅 Today's Tasks</h2>
-                <div id="tasksList" class="tasks-list-horizontal">
+            <div class="card today-card">
+                <div class="today-header">
+                    <h2>📅 Today's Tasks</h2>
+                    <div id="todaySummary" class="today-summary-inline"></div>
+                </div>
+                <div id="tasksList" class="tasks-checklist">
                     <div class="loading">Loading tasks...</div>
                 </div>
             </div>
@@ -98,6 +101,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/app.js?v=10"></script>
 </body>
 </html>

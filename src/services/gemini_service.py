@@ -118,9 +118,9 @@ Keep it realistic and achievable.
 You MUST respond with ONLY a valid JSON object. No markdown, no extra text, no code fences.
 
 The JSON must follow this EXACT structure:
-{
+{{
   "phases": [
-    {
+    {{
       "title": "Phase title here",
       "timeline": "e.g. 2 Weeks, Month 1-2, etc.",
       "goal": "One sentence describing what this phase achieves.",
@@ -132,9 +132,9 @@ The JSON must follow this EXACT structure:
         "Criterion 1",
         "Criterion 2"
       ]
-    }
+    }}
   ]
-}
+}}
 
 RULES:
 - Minimum 3 phases, maximum 10 phases.
@@ -386,7 +386,12 @@ Generate daily tasks in JSON format."""
         self, phases: list, total_days: int,
         phase_ranges: Optional[List[Tuple[int, int, int]]] = None
     ) -> list:
-        """Distribute phase tasks across their day-ranges as fallback."""
+        """
+        Distribute phase tasks across their day-ranges as fallback.
+        If a phase has fewer tasks than days, each task is split into
+        sub-steps (Research, Practice, Review) to fill the schedule with
+        2-3 tasks per day.
+        """
         daily_tasks = []
         if not phases:
             return daily_tasks
@@ -401,15 +406,44 @@ Generate daily tasks in JSON format."""
 
             start_d, end_d, dur = phase_ranges[phase_idx] if phase_idx < len(phase_ranges) else (1, total_days, total_days)
 
-            for j, task_text in enumerate(phase_tasks):
-                task_day = start_d + (j * dur) // len(phase_tasks)
+            # Expand tasks so there are ~2-3 per day within this phase
+            target_count = max(dur * 2, len(phase_tasks))
+            expanded = []
+            if len(phase_tasks) < target_count:
+                actions = [
+                    ("Study: ", 5),
+                    ("Practice: ", 4),
+                    ("Review: ", 3),
+                ]
+                for task_text in phase_tasks:
+                    for label, prio in actions:
+                        expanded.append((f"{label}{task_text}", task_text, prio))
+                        if len(expanded) >= target_count:
+                            break
+                    if len(expanded) >= target_count:
+                        break
+                # Fill remaining from other tasks
+                idx = 0
+                while len(expanded) < target_count and phase_tasks:
+                    task_text = phase_tasks[idx % len(phase_tasks)]
+                    expanded.append((f"Continue: {task_text}", task_text, 3))
+                    idx += 1
+                    if idx > target_count * 2:
+                        break
+            else:
+                for j, task_text in enumerate(phase_tasks):
+                    expanded.append((task_text, task_text, max(5 - j, 1)))
+
+            # Distribute expanded tasks evenly across the phase's days
+            for j, (title, desc, prio) in enumerate(expanded):
+                task_day = start_d + (j * dur) // len(expanded)
                 task_day = max(start_d, min(task_day, end_d))
                 daily_tasks.append({
                     "day": task_day,
                     "phase_index": phase_idx,
-                    "title": task_text[:80] if len(task_text) > 80 else task_text,
-                    "description": task_text,
-                    "priority": max(5 - j, 1)
+                    "title": title,
+                    "description": desc,
+                    "priority": prio
                 })
 
         return daily_tasks

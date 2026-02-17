@@ -39,15 +39,11 @@ async function createGoal(e) {
         
         if (response.ok) {
             const goal = await response.json();
-            showMessage('Goal created successfully!', 'success');
+            showMessage('Goal created! Generating your roadmap...', 'success');
             document.getElementById('goalForm').reset();
-            loadGoals();
-            
-            // Ask if user wants to generate roadmap
-            if (confirm('Goal created! Would you like to generate an AI roadmap now?')) {
-                // Redirect to roadmap page
+            setTimeout(() => {
                 window.location.href = `/roadmap?goalId=${goal.id}`;
-            }
+            }, 800);
         } else {
             throw new Error('Failed to create goal');
         }
@@ -118,51 +114,73 @@ async function loadTodayTasks() {
         const data = await response.json();
         
         const tasksList = document.getElementById('tasksList');
+        const summaryEl = document.getElementById('todaySummary');
         
         if (data.tasks.length === 0) {
-            tasksList.innerHTML = '<p style="color: var(--text-secondary); text-align: center; width: 100%;">No tasks for today. Create a goal and approve a roadmap to get started!</p>';
+            summaryEl.innerHTML = '';
+            tasksList.innerHTML = '<p class="empty-state">No tasks for today. Create a goal and approve a roadmap to get started!</p>';
             return;
         }
 
-        // Show summary bar
+        // Update inline summary
         const rescheduledNote = data.rescheduled
             ? `<span class="summary-rescheduled">${data.rescheduled} carried over</span>`
             : '';
-        const summaryHtml = `
-            <div class="today-summary">
-                <span class="summary-total">${data.total} tasks today</span>
-                <span class="summary-done">${data.completed} done</span>
-                <span class="summary-due">${data.due} remaining</span>
-                ${rescheduledNote}
-            </div>
+        summaryEl.innerHTML = `
+            <span class="summary-done">${data.completed}/${data.total} done</span>
+            <span class="summary-due">${data.due} remaining</span>
+            ${rescheduledNote}
         `;
         
-        const tasksHtml = data.tasks.map(task => {
-            const contextLabel = task.goal_title
-                ? `<span class="task-context">${task.goal_title}${task.milestone_title ? ' · ' + task.milestone_title : ''}</span>`
-                : '';
+        // Group tasks by milestone
+        const groups = {};
+        const noGroup = [];
+        data.tasks.forEach(task => {
+            const key = task.milestone_title || null;
+            if (key) {
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(task);
+            } else {
+                noGroup.push(task);
+            }
+        });
+
+        let html = '';
+        let num = 1;
+
+        const renderTask = (task) => {
+            const isDone = task.status === 1;
             const rescheduledBadge = task.rescheduled
-                ? '<span class="task-rescheduled-badge">carried over</span>'
+                ? ' <span class="task-rescheduled-badge">carried over</span>'
                 : '';
-            return `
-                <div class="task-item ${task.status === 1 ? 'task-completed' : ''} ${task.rescheduled ? 'task-rescheduled' : ''}">
-                    <input type="checkbox" 
-                           class="task-checkbox" 
-                           ${task.status === 1 ? 'checked' : ''} 
+            const row = `
+                <label class="checklist-row ${isDone ? 'done' : ''} ${task.rescheduled ? 'rescheduled' : ''}" for="task-${task.id}">
+                    <input type="checkbox" id="task-${task.id}"
+                           class="checklist-cb"
+                           ${isDone ? 'checked' : ''}
                            onchange="toggleTask(${task.id}, this.checked)">
-                    <div class="task-content">
-                        <div class="task-title" style="${task.status === 1 ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
-                            ${task.title} ${rescheduledBadge}
-                        </div>
-                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
-                        ${contextLabel}
-                    </div>
+                    <span class="checklist-num">${num}</span>
+                    <span class="checklist-text">${task.title}${rescheduledBadge}</span>
                     <span class="task-priority priority-${task.priority}">P${task.priority}</span>
-                </div>
-            `;
-        }).join('');
-        
-        tasksList.innerHTML = summaryHtml + tasksHtml;
+                </label>`;
+            num++;
+            return row;
+        };
+
+        // Render grouped tasks
+        for (const [milestone, tasks] of Object.entries(groups)) {
+            html += `<div class="checklist-group">
+                <div class="checklist-phase-header">${milestone}</div>
+                ${tasks.map(renderTask).join('')}
+            </div>`;
+        }
+
+        // Render ungrouped tasks
+        if (noGroup.length) {
+            html += noGroup.map(renderTask).join('');
+        }
+
+        tasksList.innerHTML = html;
     } catch (error) {
         console.error('Error loading tasks:', error);
     }

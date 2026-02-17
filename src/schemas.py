@@ -89,7 +89,7 @@ class MilestoneResponse(BaseModel):
 class TaskCreate(BaseModel):
     """Schema for creating a task"""
     milestone_id: Optional[int] = None
-    title: str = Field(..., min_length=1, max_length=255, description="Task title")
+    title: str = Field(..., min_length=1, description="Task title")
     description: Optional[str] = Field(None, description="Detailed task description")
     category: str = Field(default="daily", description="Task category: daily, weekly, milestone")
     priority: int = Field(default=0, ge=0, le=5, description="Priority level 0-5")
@@ -98,7 +98,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     """Schema for updating a task"""
-    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    title: Optional[str] = Field(None, min_length=1)
     description: Optional[str] = None
     status: Optional[int] = Field(None, ge=-1, le=1, description="Status: -1=missed, 0=due, 1=completed")
     priority: Optional[int] = Field(None, ge=0, le=5)

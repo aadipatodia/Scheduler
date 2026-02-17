@@ -107,7 +107,7 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     milestone_id = Column(Integer, ForeignKey("milestones.id"), nullable=True)
-    title = Column(String(255), nullable=False)
+    title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     category = Column(String(50), default="daily")  # daily, weekly, milestone
     status = Column(Integer, default=0)  # 0=due, 1=completed, -1=missed
