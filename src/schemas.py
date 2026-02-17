@@ -42,6 +42,7 @@ class RoadmapResponse(BaseModel):
     id: int
     goal_id: int
     roadmap_text: str
+    phases: Optional[str] = None
     approved: int
     created_at: datetime
     updated_at: datetime

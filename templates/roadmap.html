@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap Journey - AI Scheduler</title>
+    <link rel="stylesheet" href="/static/styles.css?v=6">
+    <link rel="stylesheet" href="/static/roadmap.css?v=6">
+</head>
+<body>
+    <div class="roadmap-page">
+        <div class="roadmap-header">
+            <h1 id="goalTitle">Your Journey Begins</h1>
+            <div class="goal-info">
+                <div class="info-item">
+                    <span class="icon">🎯</span>
+                    <span>Goal: <span class="value" id="goalName">Loading...</span></span>
+                </div>
+                <div class="info-item">
+                    <span class="icon">📅</span>
+                    <span>Target: <span class="value" id="goalDeadline">Loading...</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generating State -->
+        <div id="generatingState" class="generating-roadmap">
+            <div class="spinner"></div>
+            <div class="generating-text">🤖 Gemini is crafting your roadmap...</div>
+            <div class="generating-subtext">Analyzing your goal and creating a personalized journey</div>
+        </div>
+
+        <!-- Journey Container (Hidden initially) -->
+        <div id="journeyContainer" class="journey-container" style="display: none;">
+            <!-- Progress Indicator -->
+            <div class="progress-indicator">
+                <div>Phase <span id="currentPhase">1</span> of <span id="totalPhases">0</span></div>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Phase Dots Navigation -->
+            <div id="phaseDots" class="phase-dots"></div>
+
+            <!-- Single Phase Display -->
+            <div id="phasesContainer" class="single-phase-view"></div>
+
+            <!-- Navigation -->
+            <div class="navigation-controls">
+                <button id="prevButton" class="nav-button secondary" onclick="previousPhase()" disabled>
+                    <span>←</span> Previous
+                </button>
+                <button id="nextButton" class="nav-button" onclick="nextPhase()">
+                    Next <span>→</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Final Review (Hidden initially) -->
+        <div id="finalReview" class="final-review" style="display: none;">
+            <h2>🎉 Your Roadmap is Ready!</h2>
+            <p>You've reviewed all phases of your journey. Would you like to approve this roadmap or request changes?</p>
+            <div class="final-actions">
+                <button class="approve-button" onclick="approveRoadmap()">
+                    ✓ Approve Roadmap
+                </button>
+                <button class="changes-button" onclick="requestChanges()">
+                    ✎ Request Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changes Modal -->
+    <div id="changesModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Request Changes</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                What would you like to change about this roadmap?
+            </p>
+            <textarea id="changesText" placeholder="E.g., Make it shorter, add more focus on deep learning, adjust timeline..."></textarea>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeChangesModal()">Cancel</button>
+                <button onclick="submitChanges()">Submit Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/roadmap.js?v=6"></script>
+</body>
+</html>

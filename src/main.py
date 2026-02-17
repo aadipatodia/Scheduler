@@ -60,7 +60,10 @@ async def home(request: Request):
     """Serve the frontend"""
     return templates.TemplateResponse("index.html", {"request": request})
 
-
+@app.get("/roadmap", response_class=HTMLResponse)
+async def roadmap_page(request: Request):
+    """Serve the roadmap journey page"""
+    return templates.TemplateResponse("roadmap.html", {"request": request})
 # ==================== API ROUTES ====================
 
 @app.get("/api/health")
@@ -128,14 +131,24 @@ async def delete_goal(
     db: Session = Depends(get_db)
 ):
     """
-    Delete a goal
+    Delete a goal and all related data (roadmap, milestones, tasks, logs)
     """
+    from .models import RecalibrationLog, ConversationHistory
+    
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     
-    db.delete(goal)
-    db.commit()
+    try:
+        # Manually clean up any records that might not be covered by cascade
+        db.query(RecalibrationLog).filter(RecalibrationLog.goal_id == goal_id).delete()
+        db.query(ConversationHistory).filter(ConversationHistory.goal_id == goal_id).delete()
+        
+        db.delete(goal)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete goal: {str(e)}")
     
     return {"message": "Goal deleted", "goal_id": goal_id}
 
@@ -149,14 +162,14 @@ async def generate_roadmap(
     db: Session = Depends(get_db)
 ):
     """
-    Generate AI roadmap for a goal
+    Generate AI roadmap for a goal (returns structured JSON phases)
     """
-    # Check if goal exists
+    import json as json_module
+    
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     
-    # Check if roadmap already exists
     existing_roadmap = db.query(Roadmap).filter(Roadmap.goal_id == goal_id).first()
     if existing_roadmap and existing_roadmap.approved == 1:
         raise HTTPException(
@@ -164,21 +177,29 @@ async def generate_roadmap(
             detail="Approved roadmap already exists for this goal"
         )
     
-    # Generate roadmap using Gemini
-    roadmap_text = await gemini_service.generate_roadmap(
+    target_date_str = None
+    if goal.target_date:
+        target_date_str = goal.target_date.strftime("%B %d, %Y")
+    
+    result = await gemini_service.generate_roadmap(
         goal=goal.title,
-        context=context or goal.description
+        context=context or goal.description,
+        target_date=target_date_str
     )
     
-    # Create or update roadmap
+    roadmap_text = result.get("roadmap_text", "")
+    phases_json = json_module.dumps(result["phases"]) if result.get("phases") else None
+    
     if existing_roadmap:
         existing_roadmap.roadmap_text = roadmap_text
+        existing_roadmap.phases = phases_json
         existing_roadmap.updated_at = datetime.utcnow()
         roadmap = existing_roadmap
     else:
         roadmap = Roadmap(
             goal_id=goal_id,
             roadmap_text=roadmap_text,
+            phases=phases_json,
             approved=0
         )
         db.add(roadmap)
@@ -209,17 +230,116 @@ async def approve_roadmap(
     db: Session = Depends(get_db)
 ):
     """
-    Approve a roadmap and start generating tasks
+    Approve a roadmap and generate daily tasks from phases
     """
+    import json as json_module
+
     roadmap = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
-    
+
+    goal = db.query(Goal).filter(Goal.id == roadmap.goal_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    # Mark roadmap as approved
     roadmap.approved = 1
     roadmap.updated_at = datetime.utcnow()
+
+    # Parse phases from roadmap
+    phases = []
+    if roadmap.phases:
+        try:
+            parsed = json_module.loads(roadmap.phases) if isinstance(roadmap.phases, str) else roadmap.phases
+            if isinstance(parsed, list):
+                phases = parsed
+        except (json_module.JSONDecodeError, TypeError):
+            pass
+
+    if not phases:
+        db.commit()
+        return {"message": "Roadmap approved (no phases to generate tasks from)", "roadmap_id": roadmap_id, "tasks_created": 0}
+
+    # Calculate total days for the roadmap
+    today = datetime.utcnow().date()
+    if goal.target_date:
+        total_days = max((goal.target_date.date() - today).days, len(phases))
+    else:
+        total_days = len(phases) * 7  # Default: ~1 week per phase
+
+    # Clean up old milestones and tasks for this goal before regenerating
+    old_milestones = db.query(Milestone).filter(Milestone.goal_id == goal.id).all()
+    for ms in old_milestones:
+        db.query(AuditLog).filter(AuditLog.task_id.in_(
+            db.query(Task.id).filter(Task.milestone_id == ms.id)
+        )).delete(synchronize_session=False)
+        db.query(Task).filter(Task.milestone_id == ms.id).delete(synchronize_session=False)
+    db.query(Milestone).filter(Milestone.goal_id == goal.id).delete(synchronize_session=False)
+    db.flush()
+
+    # Compute day ranges per phase from their timeline strings
+    phase_ranges = gemini_service.compute_phase_day_ranges(phases, total_days)
+
+    # Create Milestone records from phases using computed ranges
+    milestone_map = {}  # phase_index -> milestone
+
+    for i, phase in enumerate(phases):
+        start_d, end_d, dur = phase_ranges[i] if i < len(phase_ranges) else (1, total_days, total_days)
+        phase_start = today + timedelta(days=start_d - 1)
+        phase_end = today + timedelta(days=end_d - 1)
+
+        milestone = Milestone(
+            goal_id=goal.id,
+            title=phase.get('title', f'Phase {i + 1}'),
+            description=phase.get('goal', ''),
+            order_index=i,
+            target_date=datetime.combine(phase_end, datetime.min.time()),
+            status="in_progress" if i == 0 else "pending"
+        )
+        db.add(milestone)
+        db.flush()
+        milestone_map[i] = milestone
+
+    # Generate daily tasks via Gemini (uses the same phase_ranges internally)
+    try:
+        daily_tasks = await gemini_service.generate_daily_tasks_from_roadmap(
+            phases=phases,
+            goal_title=goal.title,
+            total_days=total_days
+        )
+    except Exception as e:
+        print(f"Gemini daily task generation failed, using fallback: {e}")
+        daily_tasks = gemini_service._fallback_distribute_tasks(phases, total_days, phase_ranges)
+
+    # Create Task records
+    tasks_created = 0
+    for task_data in daily_tasks:
+        day_num = task_data.get("day", 1)
+        phase_idx = task_data.get("phase_index", 0)
+        scheduled = datetime.combine(today + timedelta(days=day_num - 1), datetime.min.time())
+
+        milestone = milestone_map.get(phase_idx, list(milestone_map.values())[0])
+
+        task = Task(
+            milestone_id=milestone.id,
+            title=task_data.get("title", "Task"),
+            description=task_data.get("description", ""),
+            category="daily",
+            priority=min(max(task_data.get("priority", 3), 1), 5),
+            scheduled_date=scheduled,
+            status=0  # DUE
+        )
+        db.add(task)
+        tasks_created += 1
+
     db.commit()
-    
-    return {"message": "Roadmap approved", "roadmap_id": roadmap_id}
+
+    return {
+        "message": "Roadmap approved! Daily tasks generated.",
+        "roadmap_id": roadmap_id,
+        "tasks_created": tasks_created,
+        "milestones_created": len(milestone_map)
+    }
 
 
 @app.post("/roadmaps/{roadmap_id}/refine", response_model=RoadmapResponse)
@@ -229,26 +349,25 @@ async def refine_roadmap(
     db: Session = Depends(get_db)
 ):
     """
-    Refine roadmap based on user feedback
+    Refine roadmap based on user feedback (returns structured JSON phases)
     """
+    import json as json_module
+    
     roadmap = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
     
-    # Build conversation history
-    conversation_history = [
-        {"role": "assistant", "content": roadmap.roadmap_text},
-        {"role": "user", "content": feedback}
-    ]
+    # Send current phases JSON to Gemini for refinement
+    current_data = roadmap.phases if roadmap.phases else roadmap.roadmap_text
     
-    # Refine roadmap
-    refined_text = await gemini_service.refine_roadmap(
-        current_roadmap=roadmap.roadmap_text,
-        user_feedback=feedback,
-        conversation_history=conversation_history
+    result = await gemini_service.refine_roadmap(
+        current_phases_json=current_data,
+        user_feedback=feedback
     )
     
-    roadmap.roadmap_text = refined_text
+    roadmap.roadmap_text = result.get("roadmap_text", "")
+    if result.get("phases"):
+        roadmap.phases = json_module.dumps(result["phases"])
     roadmap.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(roadmap)
@@ -303,26 +422,82 @@ async def list_tasks(
     return tasks
 
 
-@app.get("/tasks/today", response_model=DailyTasksResponse)
+@app.get("/tasks/today")
 async def get_today_tasks(
     db: Session = Depends(get_db)
 ):
     """
-    Get all tasks scheduled for today
+    Get all tasks scheduled for today, enriched with milestone/goal info.
+    Automatically reschedules overdue incomplete tasks to today.
     """
     today = datetime.utcnow().date()
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+
+    # Auto-reschedule: find overdue tasks (scheduled before today, still DUE)
+    overdue_tasks = db.query(Task).filter(
+        Task.scheduled_date < today_start,
+        Task.status == 0  # still DUE / not completed
+    ).all()
+
+    rescheduled_ids = set()
+    for t in overdue_tasks:
+        old_date = t.scheduled_date
+        t.scheduled_date = today_start
+        t.updated_at = datetime.utcnow()
+        rescheduled_ids.add(t.id)
+
+        audit = AuditLog(
+            task_id=t.id,
+            action="rescheduled",
+            field_name="scheduled_date",
+            old_value=old_date.isoformat() if old_date else None,
+            new_value=today_start.isoformat(),
+            reason="Auto-rescheduled: incomplete task from a previous day"
+        )
+        db.add(audit)
+
+    if rescheduled_ids:
+        db.commit()
+
+    # Now fetch all of today's tasks (including just-rescheduled ones)
     tasks = db.query(Task).filter(
-        Task.scheduled_date >= datetime.combine(today, datetime.min.time()),
-        Task.scheduled_date < datetime.combine(today + timedelta(days=1), datetime.min.time())
+        Task.scheduled_date >= today_start,
+        Task.scheduled_date < today_end
     ).order_by(Task.priority.desc(), Task.created_at).all()
-    
+
+    enriched_tasks = []
+    for t in tasks:
+        task_dict = {
+            "id": t.id,
+            "milestone_id": t.milestone_id,
+            "title": t.title,
+            "description": t.description,
+            "category": t.category,
+            "status": t.status,
+            "priority": t.priority,
+            "scheduled_date": t.scheduled_date.isoformat() if t.scheduled_date else None,
+            "completed_date": t.completed_date.isoformat() if t.completed_date else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+            "milestone_title": None,
+            "goal_title": None,
+            "rescheduled": t.id in rescheduled_ids,
+        }
+        if t.milestone_id and t.milestone:
+            task_dict["milestone_title"] = t.milestone.title
+            if t.milestone.goal:
+                task_dict["goal_title"] = t.milestone.goal.title
+        enriched_tasks.append(task_dict)
+
     return {
-        "date": today,
-        "tasks": tasks,
+        "date": today.isoformat(),
+        "tasks": enriched_tasks,
         "total": len(tasks),
         "completed": sum(1 for t in tasks if t.status == 1),
         "due": sum(1 for t in tasks if t.status == 0),
-        "missed": sum(1 for t in tasks if t.status == -1)
+        "missed": sum(1 for t in tasks if t.status == -1),
+        "rescheduled": len(rescheduled_ids)
     }
 
 

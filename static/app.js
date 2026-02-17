@@ -1,6 +1,4 @@
 const API_BASE = 'http://localhost:8000';
-let currentGoalId = null;
-let currentRoadmapId = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set up event listeners
     document.getElementById('goalForm').addEventListener('submit', createGoal);
     document.getElementById('taskForm').addEventListener('submit', createTask);
+    
+    // Set default date to today
+    document.getElementById('taskDate').valueAsDate = new Date();
 });
 
 // Create a new goal
@@ -44,7 +45,8 @@ async function createGoal(e) {
             
             // Ask if user wants to generate roadmap
             if (confirm('Goal created! Would you like to generate an AI roadmap now?')) {
-                await generateRoadmap(goal.id);
+                // Redirect to roadmap page
+                window.location.href = `/roadmap?goalId=${goal.id}`;
             }
         } else {
             throw new Error('Failed to create goal');
@@ -66,134 +68,131 @@ async function loadGoals() {
         const goalsList = document.getElementById('goalsList');
         
         if (goals.length === 0) {
-            goalsList.innerHTML = '<p style="color: #666; text-align: center;">No goals yet. Create your first goal!</p>';
+            goalsList.innerHTML = '<p style="color: var(--text-secondary); text-align: center; width: 100%;">No goals yet. Create your first goal!</p>';
             return;
         }
         
         goalsList.innerHTML = goals.map(goal => `
-            <div class="goal-item" onclick="viewGoalDetails(${goal.id})">
-                <h3>${goal.title}</h3>
+            <div class="goal-item" data-goal-id="${goal.id}">
+                <div class="goal-item-header">
+                    <h3>${goal.title}</h3>
+                    <button class="delete-goal-btn" data-goal-id="${goal.id}" title="Delete goal">
+                        <span>✕</span>
+                    </button>
+                </div>
                 <p>${goal.description || 'No description'}</p>
                 <p><strong>Target:</strong> ${goal.target_date ? new Date(goal.target_date).toLocaleDateString() : 'No date set'}</p>
-                <span class="status ${goal.status}">${goal.status}</span>
+                <div class="goal-item-footer">
+                    <span class="status ${goal.status}">${goal.status}</span>
+                    <button class="view-roadmap-btn" data-goal-id="${goal.id}">View Roadmap →</button>
+                </div>
             </div>
         `).join('');
+        
+        // Attach click handlers for view roadmap
+        goalsList.querySelectorAll('.view-roadmap-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const goalId = btn.getAttribute('data-goal-id');
+                window.location.href = `/roadmap?goalId=${goalId}`;
+            });
+        });
+        
+        // Attach click handlers for delete
+        goalsList.querySelectorAll('.delete-goal-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const goalId = btn.getAttribute('data-goal-id');
+                deleteGoal(goalId);
+            });
+        });
     } catch (error) {
         console.error('Error loading goals:', error);
     }
 }
 
-// View goal details and generate roadmap
-async function viewGoalDetails(goalId) {
-    currentGoalId = goalId;
-    
+// Load today's tasks
+async function loadTodayTasks() {
     try {
-        // Load goal
-        const goalResponse = await fetch(`${API_BASE}/goals/${goalId}`);
-        const goal = await goalResponse.json();
+        const response = await fetch(`${API_BASE}/tasks/today`);
+        const data = await response.json();
         
-        // Check if roadmap exists
-        const roadmapDiv = document.getElementById('roadmapContent');
-        roadmapDiv.innerHTML = '<div class="loading">Loading roadmap...</div>';
+        const tasksList = document.getElementById('tasksList');
         
-        // Try to load existing roadmap
-        // Note: You might want to add an endpoint to get roadmap by goal_id
-        // For now, we'll check if one exists and show generate button
+        if (data.tasks.length === 0) {
+            tasksList.innerHTML = '<p style="color: var(--text-secondary); text-align: center; width: 100%;">No tasks for today. Create a goal and approve a roadmap to get started!</p>';
+            return;
+        }
+
+        // Show summary bar
+        const rescheduledNote = data.rescheduled
+            ? `<span class="summary-rescheduled">${data.rescheduled} carried over</span>`
+            : '';
+        const summaryHtml = `
+            <div class="today-summary">
+                <span class="summary-total">${data.total} tasks today</span>
+                <span class="summary-done">${data.completed} done</span>
+                <span class="summary-due">${data.due} remaining</span>
+                ${rescheduledNote}
+            </div>
+        `;
         
-        const hasRoadmap = false; // You'll need to implement this check
-        
-        if (!hasRoadmap) {
-            roadmapDiv.innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <p style="color: #666; margin-bottom: 20px;">No roadmap generated yet for this goal.</p>
-                    <button onclick="generateRoadmap(${goalId})" class="btn-secondary">
-                        Generate AI Roadmap with Gemini
-                    </button>
+        const tasksHtml = data.tasks.map(task => {
+            const contextLabel = task.goal_title
+                ? `<span class="task-context">${task.goal_title}${task.milestone_title ? ' · ' + task.milestone_title : ''}</span>`
+                : '';
+            const rescheduledBadge = task.rescheduled
+                ? '<span class="task-rescheduled-badge">carried over</span>'
+                : '';
+            return `
+                <div class="task-item ${task.status === 1 ? 'task-completed' : ''} ${task.rescheduled ? 'task-rescheduled' : ''}">
+                    <input type="checkbox" 
+                           class="task-checkbox" 
+                           ${task.status === 1 ? 'checked' : ''} 
+                           onchange="toggleTask(${task.id}, this.checked)">
+                    <div class="task-content">
+                        <div class="task-title" style="${task.status === 1 ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
+                            ${task.title} ${rescheduledBadge}
+                        </div>
+                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                        ${contextLabel}
+                    </div>
+                    <span class="task-priority priority-${task.priority}">P${task.priority}</span>
                 </div>
             `;
-        }
+        }).join('');
+        
+        tasksList.innerHTML = summaryHtml + tasksHtml;
     } catch (error) {
-        console.error('Error loading goal details:', error);
+        console.error('Error loading tasks:', error);
     }
 }
 
-// Generate roadmap with AI
-async function generateRoadmap(goalId) {
-    const roadmapDiv = document.getElementById('roadmapContent');
-    roadmapDiv.innerHTML = '<div class="loading">Gemini is generating your roadmap... This may take a moment</div>';
+// View goal - redirect to roadmap page
+function viewGoal(goalId) {
+    window.location.href = `/roadmap?goalId=${goalId}`;
+}
+
+// Delete a goal
+async function deleteGoal(goalId) {
+    if (!confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+        return;
+    }
     
     try {
-        const response = await fetch(`${API_BASE}/goals/${goalId}/roadmap`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+        const response = await fetch(`${API_BASE}/goals/${goalId}`, {
+            method: 'DELETE'
         });
         
         if (response.ok) {
-            const roadmap = await response.json();
-            currentRoadmapId = roadmap.id;
-            displayRoadmap(roadmap);
-            showMessage('Roadmap generated successfully!', 'success');
+            showMessage('Goal deleted successfully!', 'success');
+            loadGoals();
+            loadStats();
         } else {
-            throw new Error('Failed to generate roadmap');
+            throw new Error('Failed to delete goal');
         }
     } catch (error) {
-        roadmapDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-    }
-}
-
-// Display roadmap
-function displayRoadmap(roadmap) {
-    const roadmapDiv = document.getElementById('roadmapContent');
-    roadmapDiv.innerHTML = `
-        <div class="roadmap-content">${roadmap.roadmap_text}</div>
-        <div style="margin-top: 20px; display: flex; gap: 10px;">
-            <button onclick="approveRoadmap(${roadmap.id})" class="btn-success" style="flex: 1;">
-                Approve Roadmap
-            </button>
-            <button onclick="refineRoadmap(${roadmap.id})" class="btn-secondary" style="flex: 1;">
-                Request Changes
-            </button>
-        </div>
-    `;
-}
-
-// Approve roadmap
-async function approveRoadmap(roadmapId) {
-    try {
-        const response = await fetch(`${API_BASE}/roadmaps/${roadmapId}/approve`, {
-            method: 'PUT'
-        });
-        
-        if (response.ok) {
-            showMessage('Roadmap approved! You can now start creating tasks.', 'success');
-        }
-    } catch (error) {
-        showMessage('Error approving roadmap: ' + error.message, 'error');
-    }
-}
-
-// Refine roadmap
-async function refineRoadmap(roadmapId) {
-    const feedback = prompt('What changes would you like to make to the roadmap?');
-    if (!feedback) return;
-    
-    const roadmapDiv = document.getElementById('roadmapContent');
-    roadmapDiv.innerHTML = '<div class="loading">Refining roadmap based on your feedback...</div>';
-    
-    try {
-        const response = await fetch(`${API_BASE}/roadmaps/${roadmapId}/refine`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ feedback })
-        });
-        
-        if (response.ok) {
-            const roadmap = await response.json();
-            displayRoadmap(roadmap);
-            showMessage('Roadmap updated!', 'success');
-        }
-    } catch (error) {
-        showMessage('Error refining roadmap: ' + error.message, 'error');
+        showMessage('Error deleting goal: ' + error.message, 'error');
     }
 }
 
@@ -226,6 +225,7 @@ async function createTask(e) {
         if (response.ok) {
             showMessage('Task created successfully!', 'success');
             document.getElementById('taskForm').reset();
+            document.getElementById('taskDate').valueAsDate = new Date();
             loadTodayTasks();
             loadStats();
         } else {
@@ -236,39 +236,6 @@ async function createTask(e) {
     } finally {
         button.disabled = false;
         button.textContent = 'Create Task';
-    }
-}
-
-// Load today's tasks
-async function loadTodayTasks() {
-    try {
-        const response = await fetch(`${API_BASE}/tasks/today`);
-        const data = await response.json();
-        
-        const tasksList = document.getElementById('tasksList');
-        
-        if (data.tasks.length === 0) {
-            tasksList.innerHTML = '<p style="color: #666; text-align: center;">No tasks for today. Create some tasks!</p>';
-            return;
-        }
-        
-        tasksList.innerHTML = data.tasks.map(task => `
-            <div class="task-item">
-                <input type="checkbox" 
-                       class="task-checkbox" 
-                       ${task.status === 1 ? 'checked' : ''} 
-                       onchange="toggleTask(${task.id}, this.checked)">
-                <div class="task-content">
-                    <div class="task-title" style="${task.status === 1 ? 'text-decoration: line-through; opacity: 0.6;' : ''}">
-                        ${task.title}
-                    </div>
-                    <div class="task-description">${task.description || ''}</div>
-                </div>
-                <span class="task-priority priority-${task.priority}">P${task.priority}</span>
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Error loading tasks:', error);
     }
 }
 
@@ -327,17 +294,13 @@ async function loadStats() {
 // Show message
 function showMessage(message, type) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = type;
+    messageDiv.className = `message ${type}`;
     messageDiv.textContent = message;
-    messageDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; z-index: 1000; animation: slideIn 0.3s;';
     
     document.body.appendChild(messageDiv);
     
     setTimeout(() => {
-        messageDiv.style.animation = 'slideOut 0.3s';
+        messageDiv.style.animation = 'slideOutRight 0.3s ease';
         setTimeout(() => messageDiv.remove(), 300);
     }, 3000);
 }
-
-// Set default date to today
-document.getElementById('taskDate').valueAsDate = new Date();

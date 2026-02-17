@@ -1,0 +1,530 @@
+/* Roadmap Journey Page */
+.roadmap-page {
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.roadmap-header {
+    text-align: center;
+    padding: 40px 20px;
+    animation: fadeInDown 0.8s ease;
+}
+
+.roadmap-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+}
+
+.goal-info {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.info-item .icon {
+    font-size: 1.5rem;
+}
+
+.info-item .value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Road Journey Container */
+.journey-container {
+    max-width: 900px;
+    margin: 60px auto;
+    position: relative;
+    animation: fadeInUp 1s ease;
+}
+
+/* Phase Dots Navigation */
+.phase-dots {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+}
+
+.phase-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.phase-dot:hover {
+    border-color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.15);
+    transform: scale(1.1);
+}
+
+.phase-dot.active {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
+    transform: scale(1.15);
+}
+
+.phase-dot.completed {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.phase-dot.completed.active {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: white;
+    border-color: transparent;
+}
+
+/* Single Phase View */
+.single-phase-view {
+    min-height: 200px;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.single-phase-view.phase-exit {
+    opacity: 0;
+    transform: translateX(-30px);
+}
+
+.single-phase-view.phase-enter {
+    animation: phaseSlideIn 0.35s ease forwards;
+}
+
+@keyframes phaseSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Phase Card */
+.phase-stop {
+    position: relative;
+}
+
+.phase-content {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 32px;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+    transition: all 0.3s ease;
+}
+
+.phase-content:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.25);
+}
+
+/* Phase Header: badge + title inline */
+.phase-header-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.phase-badge {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: white;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.phase-content h2 {
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.phase-timeline {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 64px;
+}
+
+.phase-timeline .icon {
+    color: var(--accent-gold);
+}
+
+.phase-goal {
+    color: var(--text-secondary);
+    line-height: 1.7;
+    font-size: 1.05rem;
+    margin-bottom: 20px;
+    font-style: italic;
+    padding-left: 64px;
+}
+
+/* Structured Phase Sections */
+.phase-section {
+    background: rgba(99, 102, 241, 0.04);
+    padding: 20px 24px;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent-primary);
+    margin-bottom: 16px;
+}
+
+.phase-section:last-child {
+    margin-bottom: 0;
+}
+
+.phase-section h3 {
+    color: var(--accent-primary);
+    margin-bottom: 14px;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.phase-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.phase-section li {
+    padding: 6px 0;
+    color: var(--text-primary);
+    display: flex;
+    align-items: start;
+    gap: 12px;
+    line-height: 1.6;
+    font-size: 0.98rem;
+}
+
+.phase-section li::before {
+    content: '→';
+    color: var(--accent-secondary);
+    font-weight: bold;
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Success criteria section */
+.phase-success {
+    border-left-color: var(--success);
+    background: rgba(16, 185, 129, 0.04);
+}
+
+.phase-success h3 {
+    color: var(--success);
+}
+
+.phase-success li::before {
+    content: '✓';
+    color: var(--success);
+}
+
+/* Navigation Controls */
+.navigation-controls {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 40px;
+    animation: fadeInUp 0.8s ease 0.4s both;
+}
+
+.nav-button {
+    padding: 16px 40px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.nav-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5);
+}
+
+.nav-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.nav-button.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--accent-primary);
+}
+
+/* Progress Indicator */
+.progress-indicator {
+    text-align: center;
+    margin: 40px 0;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    animation: fadeIn 0.5s ease;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
+/* Loading Animation for Roadmap Generation */
+.generating-roadmap {
+    text-align: center;
+    padding: 80px 20px;
+}
+
+.spinner {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 32px;
+    border: 6px solid rgba(99, 102, 241, 0.2);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.generating-text {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.generating-subtext {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Final Review Section */
+.final-review {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    margin: 40px auto;
+    max-width: 700px;
+    text-align: center;
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.3);
+    animation: fadeInUp 0.8s ease;
+}
+
+.final-review h2 {
+    color: var(--accent-primary);
+    font-size: 2rem;
+    margin-bottom: 20px;
+}
+
+.final-review p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 32px;
+    line-height: 1.6;
+}
+
+.final-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.final-actions button {
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    min-width: 200px;
+}
+
+.approve-button {
+    background: linear-gradient(135deg, var(--success), #059669);
+}
+
+.changes-button {
+    background: linear-gradient(135deg, var(--warning), #d97706);
+}
+
+/* Changes Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 600px;
+    width: 90%;
+    border: 2px solid var(--accent-primary);
+    animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-content h3 {
+    color: var(--accent-primary);
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+}
+
+.modal-content textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(99, 102, 241, 0.2);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 20px;
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    width: auto;
+    padding: 12px 24px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .roadmap-header h1 {
+        font-size: 2rem;
+    }
+    
+    .goal-info {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .phase-content {
+        padding: 24px;
+    }
+    
+    .navigation-controls {
+        flex-direction: column;
+    }
+    
+    .nav-button {
+        width: 100%;
+    }
+    
+    .final-actions {
+        flex-direction: column;
+    }
+    
+    .final-actions button {
+        width: 100%;
+    }
+}
+
+/* Inline spinner for buttons */
+.spinner-small {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.approve-button:disabled,
+.changes-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

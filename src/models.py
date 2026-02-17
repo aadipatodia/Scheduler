@@ -44,6 +44,8 @@ class Goal(Base):
     # Relationships
     milestones = relationship("Milestone", back_populates="goal", cascade="all, delete-orphan")
     roadmap = relationship("Roadmap", back_populates="goal", uselist=False, cascade="all, delete-orphan")
+    recalibration_logs = relationship("RecalibrationLog", back_populates="goal", cascade="all, delete-orphan")
+    conversation_history = relationship("ConversationHistory", back_populates="goal", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Goal(id={self.id}, title='{self.title}')>"
@@ -160,6 +162,9 @@ class RecalibrationLog(Base):
     tasks_affected = Column(Text, nullable=True)  # JSON array of task IDs
     timestamp = Column(DateTime, default=datetime.utcnow)
 
+    # Relationships
+    goal = relationship("Goal", back_populates="recalibration_logs")
+
     def __repr__(self):
         return f"<RecalibrationLog(id={self.id}, goal_id={self.goal_id})>"
 
@@ -175,6 +180,9 @@ class ConversationHistory(Base):
     role = Column(String(20), nullable=False)  # user or assistant
     content = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    goal = relationship("Goal", back_populates="conversation_history")
 
     def __repr__(self):
         return f"<ConversationHistory(id={self.id}, role='{self.role}')>"

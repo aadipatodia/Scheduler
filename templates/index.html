@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Scheduler - Smart Goal Planning</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=6">
 </head>
 <body>
     <div class="container">
@@ -13,8 +13,8 @@
             <p>Transform your goals into actionable plans with AI</p>
         </header>
 
+        <!-- Top Row: Create Goal and Quick Task -->
         <div class="main-content">
-            <!-- Create Goal Card -->
             <div class="card">
                 <h2>Create New Goal</h2>
                 <form id="goalForm">
@@ -34,7 +34,6 @@
                 </form>
             </div>
 
-            <!-- Create Task Card -->
             <div class="card">
                 <h2>Quick Add Task</h2>
                 <form id="taskForm">
@@ -63,36 +62,34 @@
                     <button type="submit">Create Task</button>
                 </form>
             </div>
+        </div>
 
-            <!-- Today's Tasks -->
+        <!-- Today's Tasks - Full Width Below -->
+        <div class="full-width-section">
             <div class="card">
                 <h2>📅 Today's Tasks</h2>
-                <div id="tasksList" class="tasks-list">
+                <div id="tasksList" class="tasks-list-horizontal">
                     <div class="loading">Loading tasks...</div>
                 </div>
             </div>
+        </div>
 
-            <!-- Your Goals -->
+        <!-- Your Goals - Full Width -->
+        <div class="full-width-section">
             <div class="card">
                 <h2>🎯 Your Goals</h2>
-                <div id="goalsList" class="goals-list">
+                <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 0.95rem;">
+                    View roadmaps or manage your goals
+                </p>
+                <div id="goalsList" class="goals-list-horizontal">
                     <div class="loading">Loading goals...</div>
                 </div>
             </div>
+        </div>
 
-            <!-- AI Roadmap -->
-            <div class="card full-width">
-                <h2>🤖 AI-Generated Roadmap</h2>
-                <p style="color: #666; margin-bottom: 15px;">Click on a goal to generate or view its AI-powered roadmap</p>
-                <div id="roadmapContent">
-                    <p style="text-align: center; color: #999; padding: 40px;">
-                        Select a goal to generate a roadmap with Gemini AI
-                    </p>
-                </div>
-            </div>
-
-            <!-- Statistics -->
-            <div class="card full-width">
+        <!-- Statistics - Full Width -->
+        <div class="full-width-section">
+            <div class="card">
                 <h2>📊 Your Progress</h2>
                 <div id="statsContent">
                     <div class="loading">Loading statistics...</div>
@@ -101,6 +98,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>
