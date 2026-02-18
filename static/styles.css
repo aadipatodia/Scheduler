@@ -80,7 +80,7 @@ header p {
 /* Cards */
 .main-content {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
     gap: 24px;
     margin-bottom: 24px;
 }
@@ -495,18 +495,119 @@ button:disabled {
     background: var(--accent-secondary);
 }
 
-/* Responsive */
+/* ==================== RESPONSIVE ==================== */
+
 @media (max-width: 768px) {
-    header h1 {
-        font-size: 2.5rem;
+    .container {
+        padding: 12px;
     }
-    
+
+    header {
+        padding: 24px 12px;
+        margin-bottom: 20px;
+    }
+
+    header h1 {
+        font-size: 2rem;
+    }
+
+    header p {
+        font-size: 1rem;
+    }
+
     .main-content {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
-    
+
+    .card {
+        padding: 20px;
+        border-radius: 12px;
+    }
+
+    .card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 16px;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        padding: 12px 14px;
+        font-size: 0.95rem;
+    }
+
+    button {
+        padding: 12px 20px;
+        font-size: 0.95rem;
+    }
+
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+    }
+
+    .goals-list-horizontal .goal-item {
+        min-width: 260px;
+        max-width: 300px;
+    }
+
+    .today-card {
+        padding: 16px !important;
+    }
+
+    .today-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .logout-btn {
+        top: 10px;
+        right: 10px;
+        padding: 5px 10px !important;
+        font-size: 0.72rem;
+    }
+
+    .auth-card {
+        margin: 20px auto 0;
+        padding: 24px 20px;
+    }
+}
+
+@media (max-width: 400px) {
+    header h1 {
+        font-size: 1.6rem;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .stat-number {
+        font-size: 1.6rem;
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+    }
+
+    .goals-list-horizontal .goal-item {
+        min-width: 220px;
+        max-width: 260px;
     }
 }
 
@@ -598,8 +699,8 @@ button:disabled {
 .empty-state {
     color: var(--text-secondary);
     text-align: center;
-    padding: 24px 0;
-    font-size: 0.95rem;
+    padding: 32px 0;
+    font-size: 1.15rem;
 }
 
 .checklist-row {
@@ -706,4 +807,64 @@ button:disabled {
     color: var(--accent-secondary);
     padding: 10px 14px 4px;
     opacity: 0.85;
+}
+
+/* ==================== AUTH ==================== */
+
+.auth-card {
+    max-width: 420px;
+    margin: 40px auto 0;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 2px solid rgba(99,102,241,0.15);
+}
+
+.auth-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 10px 0;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.auth-tab.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+}
+
+.auth-form .form-group { margin-bottom: 16px; }
+
+/* Logout button — pinned top-right */
+.logout-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    width: auto !important;
+    background: rgba(239,68,68,0.15) !important;
+    color: var(--error) !important;
+    border: 1px solid rgba(239,68,68,0.3) !important;
+    padding: 6px 14px !important;
+    border-radius: 6px !important;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.78rem;
+    transition: background 0.2s;
+    box-shadow: none !important;
+}
+
+.logout-btn:hover {
+    background: rgba(239,68,68,0.25) !important;
+    transform: none !important;
+    box-shadow: none !important;
 }

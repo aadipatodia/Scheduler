@@ -3,7 +3,7 @@ Database models for AI-Scheduler
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import enum
@@ -26,6 +26,21 @@ class TaskCategory(enum.Enum):
     GOAL = "goal"
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String(20), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<User(id={self.id}, phone='{self.phone}')>"
+
+
 class Goal(Base):
     """
     Long-term goals table
@@ -34,6 +49,7 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     target_date = Column(DateTime, nullable=True)
@@ -42,6 +58,7 @@ class Goal(Base):
     status = Column(String(50), default="active")  # active, completed, archived
     
     # Relationships
+    user = relationship("User", back_populates="goals")
     milestones = relationship("Milestone", back_populates="goal", cascade="all, delete-orphan")
     roadmap = relationship("Roadmap", back_populates="goal", uselist=False, cascade="all, delete-orphan")
     recalibration_logs = relationship("RecalibrationLog", back_populates="goal", cascade="all, delete-orphan")
@@ -106,6 +123,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     milestone_id = Column(Integer, ForeignKey("milestones.id"), nullable=True)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
@@ -118,6 +136,7 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    user = relationship("User", back_populates="tasks")
     milestone = relationship("Milestone", back_populates="tasks")
     audit_logs = relationship("AuditLog", back_populates="task", cascade="all, delete-orphan")
 

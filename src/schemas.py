@@ -6,6 +6,22 @@ from typing import Optional, List
 from datetime import datetime
 
 
+# ==================== AUTH / USER SCHEMAS ====================
+
+class PhoneLogin(BaseModel):
+    phone: str = Field(..., min_length=7, max_length=20, description="Phone number")
+
+
+class UserResponse(BaseModel):
+    id: int
+    phone: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== GOAL SCHEMAS ====================
 
 class GoalCreate(BaseModel):
@@ -18,6 +34,7 @@ class GoalCreate(BaseModel):
 class GoalResponse(BaseModel):
     """Schema for goal responses"""
     id: int
+    user_id: int
     title: str
     description: Optional[str]
     target_date: Optional[datetime]
@@ -108,6 +125,7 @@ class TaskUpdate(BaseModel):
 class TaskResponse(BaseModel):
     """Schema for task responses"""
     id: int
+    user_id: int
     milestone_id: Optional[int]
     title: str
     description: Optional[str]

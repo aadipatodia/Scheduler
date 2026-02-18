@@ -9,7 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 
 from ..database import SessionLocal
-from ..models import Task, Goal, RecalibrationLog
+from ..models import User, Task, Goal, RecalibrationLog
 from .gemini_service import GeminiService
 
 

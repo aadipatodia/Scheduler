@@ -13,9 +13,11 @@ import uvicorn
 import os
 
 from .database import get_db, init_db
-from .models import Goal, Roadmap, Milestone, Task, AuditLog, TaskStatus
+from .models import User, Goal, Roadmap, Milestone, Task, AuditLog, TaskStatus
+from .auth import create_session_value, COOKIE_NAME, get_current_user
 from .services.gemini_service import GeminiService
 from .schemas import (
+    PhoneLogin, UserResponse,
     GoalCreate, GoalResponse, RoadmapCreate, RoadmapResponse,
     TaskCreate, TaskResponse, TaskUpdate, DailyTasksResponse
 )
@@ -72,17 +74,57 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
 
 
+# ==================== AUTH ENDPOINTS ====================
+
+@app.post("/auth/login", response_model=UserResponse)
+async def login(credentials: PhoneLogin, db: Session = Depends(get_db)):
+    """Log in (or auto-create) a user by phone number."""
+    phone = credentials.phone.strip()
+    user = db.query(User).filter(User.phone == phone).first()
+    if not user:
+        user = User(phone=phone)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    response = JSONResponse(
+        content=UserResponse.model_validate(user).model_dump(mode="json"),
+    )
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=create_session_value(user.id),
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+    )
+    return response
+
+
+@app.post("/auth/logout")
+async def logout():
+    response = JSONResponse(content={"message": "Logged out"})
+    response.delete_cookie(COOKIE_NAME)
+    return response
+
+
+@app.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
 # ==================== GOAL ENDPOINTS ====================
 
 @app.post("/goals", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     goal_data: GoalCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new long-term goal
     """
     goal = Goal(
+        user_id=current_user.id,
         title=goal_data.title,
         description=goal_data.description,
         target_date=goal_data.target_date,
@@ -98,12 +140,13 @@ async def create_goal(
 @app.get("/goals", response_model=List[GoalResponse])
 async def list_goals(
     status: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    List all goals, optionally filtered by status
+    List all goals for the current user, optionally filtered by status
     """
-    query = db.query(Goal)
+    query = db.query(Goal).filter(Goal.user_id == current_user.id)
     if status:
         query = query.filter(Goal.status == status)
     
@@ -111,53 +154,51 @@ async def list_goals(
     return goals
 
 
-@app.get("/goals/{goal_id}", response_model=GoalResponse)
-async def get_goal(
-    goal_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get a specific goal by ID
-    """
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+def _get_user_goal(goal_id: int, user_id: int, db: Session) -> Goal:
+    """Helper: fetch a goal that belongs to the given user or raise 404."""
+    goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     return goal
 
 
+@app.get("/goals/{goal_id}", response_model=GoalResponse)
+async def get_goal(
+    goal_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a specific goal by ID (must belong to current user)
+    """
+    return _get_user_goal(goal_id, current_user.id, db)
+
+
 @app.delete("/goals/{goal_id}")
 async def delete_goal(
     goal_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Delete a goal and all related data (roadmap, milestones, tasks, audit logs)
     """
     from .models import RecalibrationLog, ConversationHistory
 
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = _get_user_goal(goal_id, current_user.id, db)
 
     try:
-        # Explicitly delete bottom-up to avoid FK constraint issues
-        # 1. Delete audit logs for all tasks under this goal's milestones
-        milestone_ids = [m.id for m in db.query(Milestone.id).filter(Milestone.goal_id == goal_id).all()]
+        milestone_ids = [m.id for m in db.query(Milestone.id).filter(Milestone.goal_id == goal.id).all()]
         if milestone_ids:
             task_ids = [t.id for t in db.query(Task.id).filter(Task.milestone_id.in_(milestone_ids)).all()]
             if task_ids:
                 db.query(AuditLog).filter(AuditLog.task_id.in_(task_ids)).delete(synchronize_session=False)
-            # 2. Delete tasks
             db.query(Task).filter(Task.milestone_id.in_(milestone_ids)).delete(synchronize_session=False)
-        # 3. Delete milestones
-        db.query(Milestone).filter(Milestone.goal_id == goal_id).delete(synchronize_session=False)
-        # 4. Delete roadmap
-        db.query(Roadmap).filter(Roadmap.goal_id == goal_id).delete(synchronize_session=False)
-        # 5. Delete other related records
-        db.query(RecalibrationLog).filter(RecalibrationLog.goal_id == goal_id).delete(synchronize_session=False)
-        db.query(ConversationHistory).filter(ConversationHistory.goal_id == goal_id).delete(synchronize_session=False)
-        # 6. Delete the goal itself
-        db.query(Goal).filter(Goal.id == goal_id).delete(synchronize_session=False)
+        db.query(Milestone).filter(Milestone.goal_id == goal.id).delete(synchronize_session=False)
+        db.query(Roadmap).filter(Roadmap.goal_id == goal.id).delete(synchronize_session=False)
+        db.query(RecalibrationLog).filter(RecalibrationLog.goal_id == goal.id).delete(synchronize_session=False)
+        db.query(ConversationHistory).filter(ConversationHistory.goal_id == goal.id).delete(synchronize_session=False)
+        db.query(Goal).filter(Goal.id == goal.id).delete(synchronize_session=False)
 
         db.commit()
     except Exception as e:
@@ -173,16 +214,15 @@ async def delete_goal(
 async def generate_roadmap(
     goal_id: int,
     context: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generate AI roadmap for a goal (returns structured JSON phases)
     """
     import json as json_module
     
-    goal = db.query(Goal).filter(Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = _get_user_goal(goal_id, current_user.id, db)
     
     existing_roadmap = db.query(Roadmap).filter(Roadmap.goal_id == goal_id).first()
     if existing_roadmap and existing_roadmap.approved == 1:
@@ -227,11 +267,13 @@ async def generate_roadmap(
 @app.get("/goals/{goal_id}/roadmap", response_model=RoadmapResponse)
 async def get_roadmap(
     goal_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Get roadmap for a specific goal
+    Get roadmap for a specific goal (must belong to current user)
     """
+    _get_user_goal(goal_id, current_user.id, db)
     roadmap = db.query(Roadmap).filter(Roadmap.goal_id == goal_id).first()
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
@@ -241,7 +283,8 @@ async def get_roadmap(
 @app.put("/roadmaps/{roadmap_id}/approve")
 async def approve_roadmap(
     roadmap_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Approve a roadmap and generate daily tasks from phases
@@ -252,9 +295,7 @@ async def approve_roadmap(
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
 
-    goal = db.query(Goal).filter(Goal.id == roadmap.goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = _get_user_goal(roadmap.goal_id, current_user.id, db)
 
     # Mark roadmap as approved
     roadmap.approved = 1
@@ -335,6 +376,7 @@ async def approve_roadmap(
         milestone = milestone_map.get(phase_idx, list(milestone_map.values())[0])
 
         task = Task(
+            user_id=current_user.id,
             milestone_id=milestone.id,
             title=task_data.get("title", "Task"),
             description=task_data.get("description", ""),
@@ -360,7 +402,8 @@ async def approve_roadmap(
 async def refine_roadmap(
     roadmap_id: int,
     body: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Refine roadmap based on user feedback (returns structured JSON phases)
@@ -374,6 +417,8 @@ async def refine_roadmap(
     roadmap = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
     if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
+
+    _get_user_goal(roadmap.goal_id, current_user.id, db)
     
     # Send current phases JSON to Gemini for refinement
     current_data = roadmap.phases if roadmap.phases else roadmap.roadmap_text
@@ -398,12 +443,14 @@ async def refine_roadmap(
 @app.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 async def create_task(
     task_data: TaskCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new task
     """
     task = Task(
+        user_id=current_user.id,
         milestone_id=task_data.milestone_id,
         title=task_data.title,
         description=task_data.description,
@@ -431,18 +478,25 @@ async def create_task(
 
 @app.get("/tasks", response_model=List[TaskResponse])
 async def list_tasks(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    List all tasks
+    List all tasks for the current user
     """
-    tasks = db.query(Task).order_by(Task.scheduled_date.desc()).all()
+    tasks = (
+        db.query(Task)
+        .filter(Task.user_id == current_user.id)
+        .order_by(Task.scheduled_date.desc())
+        .all()
+    )
     return tasks
 
 
 @app.get("/tasks/today")
 async def get_today_tasks(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get all tasks scheduled for today, enriched with milestone/goal info.
@@ -452,10 +506,10 @@ async def get_today_tasks(
     today_start = datetime.combine(today, datetime.min.time())
     today_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
 
-    # Auto-reschedule: find overdue tasks (scheduled before today, still DUE)
     overdue_tasks = db.query(Task).filter(
+        Task.user_id == current_user.id,
         Task.scheduled_date < today_start,
-        Task.status == 0  # still DUE / not completed
+        Task.status == 0,
     ).all()
 
     rescheduled_ids = set()
@@ -478,10 +532,10 @@ async def get_today_tasks(
     if rescheduled_ids:
         db.commit()
 
-    # Now fetch all of today's tasks (including just-rescheduled ones)
     tasks = db.query(Task).filter(
+        Task.user_id == current_user.id,
         Task.scheduled_date >= today_start,
-        Task.scheduled_date < today_end
+        Task.scheduled_date < today_end,
     ).order_by(Task.priority.desc(), Task.created_at).all()
 
     enriched_tasks = []
@@ -519,32 +573,37 @@ async def get_today_tasks(
     }
 
 
-@app.get("/tasks/{task_id}", response_model=TaskResponse)
-async def get_task(
-    task_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get a specific task
-    """
-    task = db.query(Task).filter(Task.id == task_id).first()
+def _get_user_task(task_id: int, user_id: int, db: Session) -> Task:
+    """Helper: fetch a task that belongs to the given user or raise 404."""
+    task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@app.get("/tasks/{task_id}", response_model=TaskResponse)
+async def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a specific task (must belong to current user)
+    """
+    return _get_user_task(task_id, current_user.id, db)
 
 
 @app.put("/tasks/{task_id}", response_model=TaskResponse)
 async def update_task(
     task_id: int,
     task_update: TaskUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Update a task
+    Update a task (must belong to current user)
     """
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _get_user_task(task_id, current_user.id, db)
     
     # Track changes for audit log
     changes = []
@@ -590,14 +649,13 @@ async def update_task(
 @app.delete("/tasks/{task_id}")
 async def delete_task(
     task_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Delete a task
+    Delete a task (must belong to current user)
     """
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = _get_user_task(task_id, current_user.id, db)
     
     db.delete(task)
     db.commit()
@@ -609,16 +667,17 @@ async def delete_task(
 
 @app.get("/stats/overview")
 async def get_overview_stats(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Get overall statistics
+    Get overall statistics for the current user
     """
-    total_goals = db.query(Goal).count()
-    active_goals = db.query(Goal).filter(Goal.status == "active").count()
-    total_tasks = db.query(Task).count()
-    completed_tasks = db.query(Task).filter(Task.status == 1).count()
-    missed_tasks = db.query(Task).filter(Task.status == -1).count()
+    total_goals = db.query(Goal).filter(Goal.user_id == current_user.id).count()
+    active_goals = db.query(Goal).filter(Goal.user_id == current_user.id, Goal.status == "active").count()
+    total_tasks = db.query(Task).filter(Task.user_id == current_user.id).count()
+    completed_tasks = db.query(Task).filter(Task.user_id == current_user.id, Task.status == 1).count()
+    missed_tasks = db.query(Task).filter(Task.user_id == current_user.id, Task.status == -1).count()
     
     return {
         "goals": {
