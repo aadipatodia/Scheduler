@@ -1,6 +1,6 @@
 # Environments
 .env
-.env.template
+!.env.template
 venv/
 env/
 ENV/

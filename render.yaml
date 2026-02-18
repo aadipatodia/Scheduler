@@ -1,0 +1,28 @@
+databases:
+  - name: ai-scheduler-db
+    plan: free
+    databaseName: ai_scheduler
+    user: ai_admin
+
+services:
+  - type: web
+    name: ai-scheduler
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-scheduler-db
+          property: connectionString
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: SESSION_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_TYPE
+        value: postgresql
+      - key: DEBUG_MODE
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.6"

@@ -1,6 +1,8 @@
 """
 Main FastAPI application for AI-Scheduler
 """
+from pathlib import Path
+
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
@@ -22,16 +24,16 @@ from .schemas import (
     TaskCreate, TaskResponse, TaskUpdate, DailyTasksResponse
 )
 
-# Initialize FastAPI app
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 app = FastAPI(
     title="AI-Scheduler API",
     description="Intelligent task scheduling with AI-powered planning",
     version="1.0.0"
 )
 
-# Mount static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # CORS middleware
 app.add_middleware(
@@ -694,9 +696,10 @@ async def get_overview_stats(
 
 
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8000"))
     uvicorn.run(
-        "main:app",
+        "src.main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True
+        port=port,
+        reload=os.getenv("DEBUG_MODE", "").lower() == "true",
     )

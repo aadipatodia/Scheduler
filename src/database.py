@@ -9,10 +9,8 @@ from sqlalchemy.pool import StaticPool
 from dotenv import load_dotenv
 from .models import Base
 
-# Load environment variables
 load_dotenv()
 
-# Database configuration
 DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "./data/scheduler.db")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
@@ -23,36 +21,37 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
 
 
 def get_database_url() -> str:
-    """
-    Get database URL based on configuration
-    """
+    # Render (and other PaaS) provide DATABASE_URL directly
+    direct_url = os.getenv("DATABASE_URL")
+    if direct_url:
+        # Render uses "postgres://..." but SQLAlchemy 2.x requires "postgresql://..."
+        if direct_url.startswith("postgres://"):
+            direct_url = direct_url.replace("postgres://", "postgresql://", 1)
+        return direct_url
+
     if DATABASE_TYPE == "postgresql":
         return f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
     else:
-        # Create data directory if it doesn't exist
-        os.makedirs(os.path.dirname(SQLITE_DB_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(SQLITE_DB_PATH) or ".", exist_ok=True)
         return f"sqlite:///{SQLITE_DB_PATH}"
 
 
-# Create engine
 DATABASE_URL = get_database_url()
 
-if DATABASE_TYPE == "sqlite":
-    # SQLite specific configuration
+if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         DATABASE_URL,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
-        echo=False  # Set to True for SQL query logging
+        echo=False,
     )
 else:
-    # PostgreSQL configuration
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
-        echo=False
+        echo=False,
     )
 
 # Create session factory
