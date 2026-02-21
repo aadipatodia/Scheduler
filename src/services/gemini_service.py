@@ -336,8 +336,8 @@ The JSON must follow this EXACT structure:
     {{
       "day": 1,
       "phase_index": 0,
-      "title": "Short actionable task title",
-      "description": "Brief description of what to do",
+      "title": "Solve 5 easy array problems on LeetCode (1 hr)",
+      "description": "Focus on two-pointer and sliding window patterns. Track which ones you solved.",
       "priority": 4
     }}
   ]
@@ -350,9 +350,19 @@ RULES:
 - Generate 2-4 tasks per day, not more
 - EVERY day within a phase's range should have tasks — fill the schedule
 - Day 1 MUST have tasks (these show up immediately for the user)
-- Tasks should be specific and actionable, not vague
 - Each task title must be concise (under 80 chars)
 - Tasks should progressively build on each other within a phase
+
+CRITICAL — TASK QUALITY:
+- Every task MUST include a time estimate in the title, e.g. "(30 min)", "(1 hr)", "(1.5 hrs)"
+- Tasks must be hyper-specific and actionable. NEVER write vague titles like "Study X" or "Practice Y" or "Review Z".
+- BAD:  "Study data structures"
+- GOOD: "Implement a linked list from scratch in Python (1 hr)"
+- BAD:  "Practice algorithms"
+- GOOD: "Solve 3 medium binary-tree problems on LeetCode (1.5 hrs)"
+- BAD:  "Review Python basics"
+- GOOD: "Write a cheat-sheet for Python list/dict comprehensions with 10 examples (30 min)"
+- Descriptions should tell the user exactly WHAT to do, WHERE to do it, and HOW to verify completion.
 - The response must be ONLY the JSON object, nothing else."""
 
         prompt = f"""{system_prompt}
@@ -387,10 +397,9 @@ Generate daily tasks in JSON format."""
         phase_ranges: Optional[List[Tuple[int, int, int]]] = None
     ) -> list:
         """
-        Distribute phase tasks across their day-ranges as fallback.
-        If a phase has fewer tasks than days, each task is split into
-        sub-steps (Research, Practice, Review) to fill the schedule with
-        2-3 tasks per day.
+        Distribute phase tasks across their day-ranges as a fallback when
+        Gemini daily-task generation fails. Each phase-level task becomes
+        one daily task per day, cycling through the phase's task list.
         """
         daily_tasks = []
         if not phases:
@@ -406,45 +415,26 @@ Generate daily tasks in JSON format."""
 
             start_d, end_d, dur = phase_ranges[phase_idx] if phase_idx < len(phase_ranges) else (1, total_days, total_days)
 
-            # Expand tasks so there are ~2-3 per day within this phase
-            target_count = max(dur * 2, len(phase_tasks))
-            expanded = []
-            if len(phase_tasks) < target_count:
-                actions = [
-                    ("Study: ", 5),
-                    ("Practice: ", 4),
-                    ("Review: ", 3),
-                ]
-                for task_text in phase_tasks:
-                    for label, prio in actions:
-                        expanded.append((f"{label}{task_text}", task_text, prio))
-                        if len(expanded) >= target_count:
-                            break
-                    if len(expanded) >= target_count:
-                        break
-                # Fill remaining from other tasks
-                idx = 0
-                while len(expanded) < target_count and phase_tasks:
-                    task_text = phase_tasks[idx % len(phase_tasks)]
-                    expanded.append((f"Continue: {task_text}", task_text, 3))
-                    idx += 1
-                    if idx > target_count * 2:
-                        break
-            else:
-                for j, task_text in enumerate(phase_tasks):
-                    expanded.append((task_text, task_text, max(5 - j, 1)))
+            tasks_per_day = min(max(len(phase_tasks), 2), 3)
+            for day_offset in range(dur):
+                current_day = start_d + day_offset
+                if current_day > end_d:
+                    break
+                for slot in range(tasks_per_day):
+                    task_idx = (day_offset * tasks_per_day + slot) % len(phase_tasks)
+                    task_text = phase_tasks[task_idx]
 
-            # Distribute expanded tasks evenly across the phase's days
-            for j, (title, desc, prio) in enumerate(expanded):
-                task_day = start_d + (j * dur) // len(expanded)
-                task_day = max(start_d, min(task_day, end_d))
-                daily_tasks.append({
-                    "day": task_day,
-                    "phase_index": phase_idx,
-                    "title": title,
-                    "description": desc,
-                    "priority": prio
-                })
+                    title = task_text
+                    if len(title) > 80:
+                        title = title[:77] + "..."
+
+                    daily_tasks.append({
+                        "day": current_day,
+                        "phase_index": phase_idx,
+                        "title": f"{title} (1 hr)",
+                        "description": task_text,
+                        "priority": max(5 - slot, 2),
+                    })
 
         return daily_tasks
 

@@ -15,6 +15,7 @@ const urlParams = new URLSearchParams(window.location.search);
 goalId = urlParams.get('goalId');
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[roadmap] DOMContentLoaded, goalId=', goalId);
     if (!goalId) { alert('No goal specified!'); window.location.href = '/'; return; }
     await loadGoalDetails();
     await generateOrLoadRoadmap();
@@ -22,8 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadGoalDetails() {
     try {
+        console.log('[roadmap] loadGoalDetails: fetching goal', goalId);
         const response = await api(`/goals/${goalId}`);
         const goal = await response.json();
+        console.log('[roadmap] loadGoalDetails: goal loaded', goal.title);
         document.getElementById('goalName').textContent = goal.title;
         document.getElementById('goalTitle').textContent = goal.title;
         if (goal.target_date) {
@@ -31,35 +34,72 @@ async function loadGoalDetails() {
         } else {
             document.getElementById('goalDeadline').textContent = 'No deadline set';
         }
-    } catch (error) { console.error('Error loading goal:', error); }
+    } catch (error) {
+        console.error('[roadmap] loadGoalDetails failed:', error);
+    }
 }
 
 async function generateOrLoadRoadmap() {
+    console.log('[roadmap] generateOrLoadRoadmap: start');
+    const generatingEl = document.getElementById('generatingState');
+    generatingEl.style.display = '';
+    generatingEl.innerHTML = '<div class="spinner"></div><div class="generating-text">🤖 We are crafting your roadmap...</div><div class="generating-subtext">Analyzing your goal and creating a personalized journey</div>';
+    document.getElementById('journeyContainer').style.display = 'none';
+
     try {
         let roadmap;
         let needsGeneration = true;
 
         try {
+            console.log('[roadmap] GET /goals/' + goalId + '/roadmap');
             const response = await api(`/goals/${goalId}/roadmap`);
             if (response.ok) {
                 roadmap = await response.json();
+                console.log('[roadmap] GET roadmap ok, roadmap.id=', roadmap?.id);
                 if (roadmap.phases) {
-                    try { const p = JSON.parse(roadmap.phases); if (Array.isArray(p) && p.length > 0) needsGeneration = false; } catch (e) {}
+                    try {
+                        const p = JSON.parse(roadmap.phases);
+                        if (Array.isArray(p) && p.length > 0) {
+                            needsGeneration = false;
+                            console.log('[roadmap] existing phases found, skip generation, phases=', p.length);
+                        }
+                    } catch (e) {}
                 }
+            } else {
+                console.log('[roadmap] GET roadmap not ok, status=', response.status);
+                await response.text().catch(() => {});
             }
-        } catch (e) {}
+        } catch (e) {
+            console.log('[roadmap] GET roadmap threw', e?.message || e);
+        }
 
         if (needsGeneration) {
-            const response = await api(`/goals/${goalId}/roadmap`, { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to generate roadmap');
+            console.log('[roadmap] POST /goals/' + goalId + '/roadmap (generate)');
+            let response = await api(`/goals/${goalId}/roadmap`, { method: 'POST' });
+            if (!response.ok) {
+                const errDetail = await response.json().catch(() => ({}));
+                const msg = errDetail.detail || 'Failed to generate roadmap';
+                console.warn('[roadmap] POST generate failed, reason:', msg, 'status=', response.status, '— retrying in 2.5s');
+                await new Promise(r => setTimeout(r, 2500));
+                console.log('[roadmap] POST retry /goals/' + goalId + '/roadmap');
+                response = await api(`/goals/${goalId}/roadmap`, { method: 'POST' });
+            }
+            if (!response.ok) {
+                const errDetail = await response.json().catch(() => ({}));
+                const msg = errDetail.detail || 'Failed to generate roadmap';
+                console.error('[roadmap] POST generate failed after retry:', msg, 'status=', response.status);
+                throw new Error(msg);
+            }
             roadmap = await response.json();
+            console.log('[roadmap] POST generate ok, roadmap.id=', roadmap?.id);
         }
 
         roadmapId = roadmap.id;
+        console.log('[roadmap] loadPhases, roadmapId=', roadmapId);
         loadPhases(roadmap);
     } catch (error) {
-        console.error('Error with roadmap:', error);
-        document.getElementById('generatingState').innerHTML = `<div style="color: var(--error); padding: 40px;"><h2>Error generating roadmap</h2><p>${error.message}</p><button onclick="window.location.href='/'">Go Back</button></div>`;
+        console.error('[roadmap] generateOrLoadRoadmap error:', error?.message || error);
+        document.getElementById('generatingState').innerHTML = `<div style="color: var(--error); padding: 40px;"><h2>Error generating roadmap</h2><p>${error.message}</p><button onclick="window.location.href='/'">Go Back</button> <button onclick="generateOrLoadRoadmap(); this.disabled=true;">Retry</button></div>`;
     }
 }
 

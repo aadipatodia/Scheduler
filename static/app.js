@@ -99,7 +99,10 @@ async function createGoal(e) {
                 target_date: targetDate ? new Date(targetDate).toISOString() : null,
             }),
         });
-        if (!response) return;
+        if (!response) {
+            showMessage('Session expired or request failed. Please try again.', 'error');
+            return;
+        }
 
         if (response.ok) {
             const goal = await response.json();
@@ -229,7 +232,10 @@ async function createTask(e) {
             method: 'POST',
             body: JSON.stringify({ title, description, category: 'daily', priority: parseInt(priority), scheduled_date: scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString() }),
         });
-        if (!response) return;
+        if (!response) {
+            showMessage('Session expired or request failed. Please try again.', 'error');
+            return;
+        }
         if (response.ok) {
             showMessage('Task created successfully!', 'success');
             document.getElementById('taskForm').reset();
